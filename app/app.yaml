@@ -1,17 +1,10 @@
 # Stora Resource Health Monitoring Dashboard
 # Databricks App configuration
+# Data is bundled as CSV files - no SQL warehouse or UC permissions required.
 
 command:
   - streamlit
   - run
   - app.py
   - --server.port
-  - "8501"
-
-env:
-  - name: DATABRICKS_SERVER_HOSTNAME
-    description: "Databricks workspace hostname"
-  - name: DATABRICKS_HTTP_PATH
-    description: "SQL warehouse HTTP path"
-  - name: DATABRICKS_TOKEN
-    description: "Access token (or use service principal)"
+  - "8000"

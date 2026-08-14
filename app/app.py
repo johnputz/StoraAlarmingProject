@@ -1,51 +1,59 @@
 """Stora Resource Health Monitoring Dashboard
 A Streamlit-based prototype for monitoring battery and solar resource health.
+Data is loaded from bundled CSV files (no SQL warehouse or UC permissions required).
+Mutations (acknowledge, resolve, suppress) persist in session state for the demo.
 """
 import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import json
-from databricks import sql as dbsql
 import os
+import uuid as uuid_mod
+from pathlib import Path
 
-# --- Configuration ---
-CATALOG = "qa_analytics"
-SCHEMA = "jyp_schema"
-TABLE_PREFIX = "stora_alarm_"
+# --- Data Layer (local CSV + session state) ---
+DATA_DIR = Path(__file__).parent / "data"
 
-def table_name(name):
-    return f"{CATALOG}.{SCHEMA}.{TABLE_PREFIX}{name}"
+@st.cache_data
+def load_csv(name):
+    """Load a CSV file from the bundled data directory."""
+    path = DATA_DIR / f"{name}.csv"
+    if path.exists():
+        return pd.read_csv(path)
+    return pd.DataFrame()
 
-# --- Database Connection ---
-@st.cache_resource
-def get_connection():
-    """Get Databricks SQL connection using app service principal."""
-    return dbsql.connect(
-        server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME", st.secrets.get("server_hostname", "")),
-        http_path=os.getenv("DATABRICKS_HTTP_PATH", st.secrets.get("http_path", "")),
-        access_token=os.getenv("DATABRICKS_TOKEN", st.secrets.get("access_token", ""))
-    )
+def get_alerts():
+    """Get alerts with session-state mutations applied."""
+    if "alerts" not in st.session_state:
+        st.session_state["alerts"] = load_csv("alerts")
+    return st.session_state["alerts"]
 
-@st.cache_data(ttl=60)
-def run_query(query):
-    """Run a SQL query and return results as a DataFrame."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(query)
-    columns = [desc[0] for desc in cursor.description]
-    data = cursor.fetchall()
-    cursor.close()
-    return pd.DataFrame(data, columns=columns)
+def get_suppressions():
+    """Get suppressions including session-state additions."""
+    if "suppressions" not in st.session_state:
+        st.session_state["suppressions"] = load_csv("suppressions")
+    return st.session_state["suppressions"]
 
-def run_update(query):
-    """Run an update/insert query (no result returned)."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(query)
-    cursor.close()
-    # Clear cache after writes
-    st.cache_data.clear()
+def get_notification_config():
+    """Get notification config with session-state mutations."""
+    if "notification_config" not in st.session_state:
+        st.session_state["notification_config"] = load_csv("notification_config")
+    return st.session_state["notification_config"]
+
+def get_rules():
+    """Get rules with session-state mutations."""
+    if "rules" not in st.session_state:
+        st.session_state["rules"] = load_csv("rules")
+    return st.session_state["rules"]
+
+def update_alert(alert_id, **kwargs):
+    """Update an alert in session state."""
+    alerts = get_alerts()
+    mask = alerts["alert_id"] == alert_id
+    for key, value in kwargs.items():
+        alerts.loc[mask, key] = value
+    st.session_state["alerts"] = alerts
 
 # --- Page Config ---
 st.set_page_config(
@@ -65,17 +73,15 @@ page = st.sidebar.radio(
 )
 
 # --- Load Common Data ---
-@st.cache_data(ttl=60)
+@st.cache_data
 def load_resources():
-    return run_query(f"SELECT * FROM {table_name('resources')}")
+    return load_csv("resources")
 
-@st.cache_data(ttl=30)
 def load_alerts():
-    return run_query(f"SELECT * FROM {table_name('alerts')} ORDER BY triggered_at DESC")
+    return get_alerts()
 
-@st.cache_data(ttl=60)
 def load_rules():
-    return run_query(f"SELECT * FROM {table_name('rules')}")
+    return get_rules()
 
 
 # ============================================================
@@ -141,10 +147,9 @@ def page_dashboard():
                 padding: 20px;
                 text-align: center;
                 background: linear-gradient(135deg, {status_color}15, {status_color}05);
-                min-height: 200px;
             ">
                 <h2 style="margin:0;">{status_emoji}</h2>
-                <h3 style="margin:5px 0;">{type_icon} {res['resource_name']}</h3>
+                <h3 style="margin:5px 0; height: 2.8em; display:flex; align-items:center; justify-content:center;">{type_icon} {res['resource_name']}</h3>
                 <p style="color: gray; margin:2px 0;">{res['resource_type'].title()} | {res['nameplate_mw']:.0f} MW</p>
                 <p style="color: gray; margin:2px 0;">{res['client_name']}</p>
                 <hr style="margin: 10px 0;">
@@ -352,20 +357,16 @@ def page_rules_management():
                     with col1:
                         if rule["is_active"]:
                             if st.button(f"Disable", key=f"disable_{rule['rule_id']}"):
-                                run_update(f"""
-                                    UPDATE {table_name('rules')}
-                                    SET is_active = false, updated_at = current_timestamp()
-                                    WHERE rule_id = '{rule['rule_id']}'
-                                """)
+                                rules_df = get_rules()
+                                rules_df.loc[rules_df["rule_id"] == rule["rule_id"], "is_active"] = False
+                                st.session_state["rules"] = rules_df
                                 st.success(f"Rule {rule['rule_id']} disabled.")
                                 st.rerun()
                         else:
                             if st.button(f"Enable", key=f"enable_{rule['rule_id']}"):
-                                run_update(f"""
-                                    UPDATE {table_name('rules')}
-                                    SET is_active = true, updated_at = current_timestamp()
-                                    WHERE rule_id = '{rule['rule_id']}'
-                                """)
+                                rules_df = get_rules()
+                                rules_df.loc[rules_df["rule_id"] == rule["rule_id"], "is_active"] = True
+                                st.session_state["rules"] = rules_df
                                 st.success(f"Rule {rule['rule_id']} enabled.")
                                 st.rerun()
     
@@ -434,7 +435,7 @@ def page_notification_config():
     st.title("🔔 Notification Configuration")
     st.markdown("Configure email notifications for alerts.")
     
-    configs = run_query(f"SELECT * FROM {table_name('notification_config')}")
+    configs = get_notification_config()
     resources = load_resources()
     
     # Existing configs

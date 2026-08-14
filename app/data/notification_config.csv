@@ -1,0 +1,3 @@
+config_id,resource_id,severity_threshold,email_list,is_active
+NOTIF-001,,RED,"ops-team@springfieldpower.com,alerts@burnsindustries.com",True
+NOTIF-002,RES-002,YELLOW,smithers@burnsindustries.com,True

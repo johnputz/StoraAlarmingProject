@@ -1,0 +1,10 @@
+rule_id,rule_name,severity,condition_expression,recommended_action,applies_to_types,is_active,created_at,updated_at,created_by
+E1,Generating at negative prices (low SOC),RED,actual_mw > 5 AND da_lmp < -20 AND soc_pct < 10,Investigate immediately — resource should not be discharging at negative prices with minimal stored energy.,"battery,hybrid",True,2025-06-15,2025-06-15,system
+E2,Generating at negative prices (high SOC),YELLOW,actual_mw > 5 AND da_lmp < -50 AND soc_pct > 50,Review — may be intentional (AS obligation or ramp constraint) but warrants verification.,"battery,hybrid",True,2025-06-15,2025-06-15,system
+E3,Charging at high positive prices,YELLOW,actual_mw < -5 AND da_lmp > 200,Verify whether charge is from an AS award or a bidding error.,"battery,hybrid",True,2025-06-15,2025-06-15,system
+E4,Bid not submitted,RED,no_bid_for_operating_day = True,Stora may have failed to submit. Check Stora logs and resubmit manually if needed.,"battery,solar,hybrid",True,2025-06-15,2025-06-15,system
+D1,Dispatch not followed,RED,"abs(actual_mw - instructed_mw) > max(5, instructed_mw * 0.10)","Resource is non-compliant. Check plant status, communications, and inverter faults.","battery,solar,hybrid",True,2025-06-15,2025-06-15,system
+D2,Dispatch exceeds capacity,YELLOW,instructed_mw > nameplate_mw,ISO may have stale parameters. File ticket to update resource limits.,"battery,solar,hybrid",True,2025-06-15,2025-06-15,system
+S1,SOC out of expected bounds,YELLOW,soc_pct < 5 OR soc_pct > 95,May indicate metering drift or unexpected cycling.,"battery,hybrid",True,2025-06-15,2025-06-15,system
+S2,SOC flatline,YELLOW,soc_unchanged_hours >= 4 AND has_active_awards = True,Possible meter/BMS communication failure.,"battery,hybrid",True,2025-06-15,2025-06-15,system
+S3,Throughput exceeds daily limit,YELLOW,daily_throughput_mwh > capacity_mwh * 2,Alert asset manager — may need to curtail to protect warranty.,"battery,hybrid",True,2025-06-15,2025-06-15,system

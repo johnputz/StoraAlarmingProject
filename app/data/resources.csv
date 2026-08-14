@@ -1,0 +1,5 @@
+resource_id,resource_name,resource_type,iso,node,nameplate_mw,capacity_mwh,client_name
+RES-001,Springfield Solar,solar,CAISO,SPRNGFLD_1_SOLAR,50.0,,Springfield Power Co
+RES-002,Burns Battery,battery,CAISO,BURNS_1_BESS,100.0,400.0,Burns Industries
+RES-003,Shelbyville Sun & Store,hybrid,CAISO,SHELBY_2_HYBRD,75.0,200.0,Shelbyville Municipal
+RES-004,Krusty's Clean Energy,hybrid,CAISO,KRUSTY_1_HYBRD,60.0,150.0,Krusty Brand Enterprises
