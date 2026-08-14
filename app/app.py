@@ -180,6 +180,9 @@ def page_dashboard():
 # PAGE: RESOURCE DETAIL (Drill-Down)
 # ============================================================
 def page_resource_detail():
+    if st.button("← Back to Dashboard", key="back_to_dash"):
+        st.session_state["page"] = "Dashboard"
+        st.rerun()
     st.title("🔍 Resource Detail")
     
     resources = load_resources()
