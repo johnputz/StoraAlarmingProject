@@ -189,6 +189,9 @@ def page_dashboard():
 # PAGE: RESOURCE DETAIL (Drill-Down)
 # ============================================================
 def page_resource_detail():
+    if st.button("← Back to Dashboard"):
+        st.session_state["page"] = "Dashboard"
+        st.rerun()
     st.title("🔍 Resource Detail")
     
     resources = load_resources()
@@ -274,10 +277,14 @@ def page_resource_detail():
                 if st.session_state.get(f"resolving_{alert['alert_id']}"):
                     notes = st.text_area("Resolution notes:", key=f"notes_{alert['alert_id']}")
                     if st.button("Submit Resolution", key=f"submit_res_{alert['alert_id']}"):
-                        update_alert(alert['alert_id'], status='RESOLVED',
-                                    resolved_by='current_user',
-                                    resolved_at=datetime.now().isoformat(),
-                                    resolution_notes=notes)
+                        run_update(f"""
+                            UPDATE {table_name('alerts')}
+                            SET status = 'RESOLVED',
+                                resolved_by = 'current_user',
+                                resolved_at = current_timestamp(),
+                                resolution_notes = '{notes}'
+                            WHERE alert_id = '{alert['alert_id']}'
+                        """)
                         st.session_state[f"resolving_{alert['alert_id']}"] = False
                         st.success("Alert resolved!")
                         st.rerun()
