@@ -251,6 +251,15 @@ def _render_soc_chart(resource_id, op_date, highlight_df):
 def page_dashboard():
     st.title("\U0001f4ca Resource Health Dashboard")
     st.markdown("Real-time status of all managed resources. Click a resource for details.")
+    
+    with st.expander("ℹ️ How to use this Dashboard", expanded=False):
+        st.markdown("""
+        - **Tiles** show each resource's current health: 🟢 Green = no issues, 🟡 Yellow = warnings, 🔴 Red = critical alerts
+        - **Resource Type** filter: show/hide resources by type (solar, battery, hybrid)
+        - **Status** filter: show/hide tiles by their health color
+        - **Rule Type** filter: toggle between Day-Ahead (DA) and Real-Time (RT) rules — DA rules can be evaluated before the operating day; RT rules require actuals/telemetry
+        - Click **Details →** on any tile to drill into that resource's alerts and take action
+        """)
 
     resources = load_resources()
     alerts = load_alerts()
@@ -343,6 +352,17 @@ def page_resource_detail():
         st.session_state["page"] = "Dashboard"
         st.rerun()
     st.title("\U0001f50d Resource Detail")
+    
+    with st.expander("ℹ️ How to use Resource Detail", expanded=False):
+        st.markdown("""
+        - **Select a resource** from the dropdown to view its alerts
+        - Each alert expander shows the rule that fired, when, and recommended actions
+        - **Action buttons:**
+            - ✅ **Acknowledge** — mark that you've seen the alert (stays open for resolution)
+            - ✔️ **Resolve** — close the alert with resolution notes
+            - 🚫 **Suppress** — silence this rule for this resource for a set duration
+            - 🔍 **Investigate** — expand a time-series chart showing the data around the alert with fired hours highlighted in red
+        """)
 
     resources = load_resources()
     alerts = load_alerts()
@@ -456,6 +476,14 @@ def page_resource_detail():
 def page_rules_management():
     st.title("\u2699\ufe0f Rules Management")
     rules = load_rules()
+
+    with st.expander("ℹ️ How to use Rules Management", expanded=False):
+        st.markdown("""
+        - **Active Rules** — view, filter (DA/RT), and enable/disable existing rules
+        - **Create Rule** — define a new rule with severity, data requirement (DA vs RT), condition expression, and assignment scope (all resources, by type, or specific resources)
+        - **Backtest Rule** — pick a rule + date to verify it fires correctly against historical data. Great for validating new rules before going live.
+        - **AI Rule Builder** — describe a rule in plain English (placeholder for production LLM integration)
+        """)
 
     tab1, tab2, tab3, tab4 = st.tabs(["\U0001f4dc Active Rules", "\u2795 Create Rule", "\U0001f50d Backtest Rule", "\U0001f9e0 AI Rule Builder"])
 
@@ -578,6 +606,14 @@ def page_notification_config():
     configs = get_notification_config()
     resources = load_resources()
 
+    with st.expander("ℹ️ How notifications work", expanded=False):
+        st.markdown("""
+        - **Notification rules** define who gets emailed when alerts fire
+        - Set a **severity threshold** — "RED" means only critical alerts notify; "YELLOW" means warnings too
+        - Assign to **All Resources** or a specific resource
+        - Toggle rules on/off without deleting them
+        """)
+
     st.subheader("Current Notification Rules")
     if not configs.empty:
         for _, config in configs.iterrows():
@@ -618,6 +654,15 @@ def page_issue_log():
     st.title("\U0001f4cb Issue Log")
     alerts = load_alerts()
     resources = load_resources()
+    
+    with st.expander("ℹ️ How to use the Issue Log", expanded=False):
+        st.markdown("""
+        - **Filterable audit trail** of all alerts across all resources
+        - Use **Market** filter (DA/RT) to focus on specific market types — e.g., filter to DA + weekend dates to review Monday morning
+        - Use **Status** filter to find unresolved alerts or review past resolutions
+        - Use **Rule** filter to isolate alerts from specific rules
+        """)
+    
     if alerts.empty:
         st.info("No alerts recorded.")
         return
