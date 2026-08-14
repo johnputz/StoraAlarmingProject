@@ -8,3 +8,4 @@ D2,Dispatch exceeds capacity,YELLOW,instructed_mw > nameplate_mw,ISO may have st
 S1,SOC out of expected bounds,YELLOW,soc_pct < 5 OR soc_pct > 95,May indicate metering drift or unexpected cycling.,"battery,hybrid",True,2025-06-15,2025-06-15,system,ALL,RT
 S2,SOC flatline,YELLOW,soc_unchanged_hours >= 4 AND has_active_awards = True,Possible meter/BMS communication failure.,"battery,hybrid",True,2025-06-15,2025-06-15,system,ALL,RT
 S3,Throughput exceeds daily limit,YELLOW,daily_throughput_mwh > capacity_mwh * 2,Alert asset manager — may need to curtail to protect warranty.,"battery,hybrid",True,2025-06-15,2025-06-15,system,ALL,RT
+E5,DA award exceeds bid quantity,YELLOW,awarded_mw > bid_mw * 1.10,Review DA market results - award exceeds submitted bid by >10%. Verify no data entry error in bid submission. Check if ISO applied must-offer adjustments.,"battery,solar,hybrid",True,2025-07-01T00:00:00,2025-07-01T00:00:00,system,ALL,DA
