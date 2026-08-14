@@ -372,30 +372,129 @@ def page_rules_management():
     
     with tab2:
         st.subheader("Create New Rule")
+        resources_list = load_resources()
         with st.form("new_rule_form"):
             rule_id = st.text_input("Rule ID (e.g., E6, D3, S4)")
             rule_name = st.text_input("Rule Name")
             severity = st.selectbox("Severity", ["RED", "YELLOW"])
+            market = st.selectbox("Market", ["DA", "RT", "AS"])
             condition = st.text_area("Condition Expression", 
                                    placeholder="e.g., actual_mw > 5 AND da_lmp < -30 AND soc_pct < 15")
             action = st.text_area("Recommended Action",
                                 placeholder="What should the operator do when this rule fires?")
-            applies_to = st.multiselect("Applies to resource types", ["battery", "solar", "hybrid"], 
-                                       default=["battery", "hybrid"])
+            
+            # Rule Assignment Scope
+            st.markdown("---")
+            st.markdown("🎯 **Rule Assignment Scope**")
+            assignment_mode = st.radio(
+                "Apply this rule to:",
+                ["All resources", "By resource type", "Specific resource(s)"],
+                horizontal=True
+            )
+            
+            applies_to_types = []
+            assigned_resources = []
+            if assignment_mode == "By resource type":
+                applies_to_types = st.multiselect("Select resource types", 
+                    ["battery", "solar", "hybrid"], default=["battery", "hybrid"])
+            elif assignment_mode == "Specific resource(s)":
+                resource_options = list(resources_list["resource_name"].values)
+                assigned_resources = st.multiselect("Select resources", resource_options, key="rule_resources")
             
             submitted = st.form_submit_button("Create Rule")
             if submitted and rule_id and rule_name and condition:
-                applies_str = ",".join(applies_to)
-                run_update(f"""
-                    INSERT INTO {table_name('rules')}
-                    VALUES ('{rule_id}', '{rule_name}', '{severity}', 
-                            '{condition}', '{action}', '{applies_str}',
-                            true, current_timestamp(), current_timestamp(), 'user')
-                """)
-                st.success(f"Rule {rule_id} created successfully!")
+                if assignment_mode == "All resources":
+                    applies_str = "battery,solar,hybrid"
+                    resource_ids_str = "ALL"
+                elif assignment_mode == "By resource type":
+                    applies_str = ",".join(applies_to_types) if applies_to_types else "battery,solar,hybrid"
+                    resource_ids_str = "ALL"
+                else:
+                    applies_str = "battery,solar,hybrid"
+                    if assigned_resources:
+                        res_ids = [resources_list[resources_list['resource_name']==rn]['resource_id'].values[0] 
+                                  for rn in assigned_resources]
+                        resource_ids_str = ",".join(res_ids)
+                    else:
+                        resource_ids_str = "ALL"
+                
+                rules_df = get_rules()
+                new_rule = pd.DataFrame([{
+                    "rule_id": rule_id, "rule_name": rule_name, "severity": severity,
+                    "condition_expression": condition, "recommended_action": action,
+                    "applies_to_types": applies_str, "is_active": True,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat(), "created_by": "user",
+                    "resource_ids": resource_ids_str
+                }])
+                st.session_state["rules"] = pd.concat([rules_df, new_rule], ignore_index=True)
+                scope_msg = "All resources" if resource_ids_str == "ALL" else \
+                           f"Types: {applies_str}" if assignment_mode == "By resource type" else \
+                           f"Resources: {', '.join(assigned_resources)}"
+                st.success(f"Rule {rule_id} created! Scope: {scope_msg}")
                 st.rerun()
     
     with tab3:
+        st.subheader("🔍 Backtest Rule Against Historical Data")
+        st.markdown("""
+        Select a rule and a date to verify it would have fired as expected.
+        This validates rule logic against historical data before putting it into production.
+        """)
+        
+        rules_for_bt = get_rules()
+        if not rules_for_bt.empty:
+            rule_options = {f"{r['rule_id']}: {r['rule_name']}": r['rule_id'] for _, r in rules_for_bt.iterrows()}
+            selected_rule_label = st.selectbox("Select Rule to Backtest", list(rule_options.keys()))
+            selected_rule_id = rule_options[selected_rule_label]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                backtest_date = st.date_input("Operating Date", value=pd.Timestamp("2025-07-03"))
+            with col2:
+                backtest_resource = st.selectbox("Resource (optional)", 
+                    ["All Resources"] + list(load_resources()["resource_name"].values),
+                    key="bt_resource")
+            
+            if st.button("▶️ Run Backtest"):
+                # Check alerts for this rule/date combination
+                alerts = get_alerts()
+                bt_alerts = alerts[alerts["rule_id"] == selected_rule_id].copy()
+                
+                if "operating_date" in bt_alerts.columns:
+                    bt_alerts["operating_date"] = pd.to_datetime(bt_alerts["operating_date"]).dt.date
+                    bt_alerts = bt_alerts[bt_alerts["operating_date"] == backtest_date]
+                
+                if backtest_resource != "All Resources":
+                    res_id = load_resources()[load_resources()["resource_name"] == backtest_resource]["resource_id"].values[0]
+                    bt_alerts = bt_alerts[bt_alerts["resource_id"] == res_id]
+                
+                st.markdown("---")
+                if not bt_alerts.empty:
+                    st.success(f"✅ Rule **{selected_rule_id}** fired **{len(bt_alerts)} time(s)** on {backtest_date}:")
+                    for _, alert in bt_alerts.iterrows():
+                        severity_icon = "🔴" if alert["severity"] == "RED" else "🟡"
+                        st.markdown(f"{severity_icon} **HE{int(alert['hour_ending']) if pd.notna(alert.get('hour_ending')) else 'N/A'}:** {alert['message']}")
+                        if alert.get("details_json") and pd.notna(alert["details_json"]):
+                            try:
+                                st.json(json.loads(alert["details_json"]))
+                            except:
+                                pass
+                else:
+                    st.warning(f"⚠️ Rule **{selected_rule_id}** did NOT fire on {backtest_date}" + 
+                              (f" for {backtest_resource}" if backtest_resource != "All Resources" else "") +
+                              ". Check if the conditions were met in the data for this date.")
+                    
+                    # Show what the data looked like on that date for context
+                    st.markdown("**Data snapshot for this date (for debugging):**")
+                    prices = load_csv("prices")
+                    prices["operating_date"] = pd.to_datetime(prices["operating_date"]).dt.date
+                    day_prices = prices[prices["operating_date"] == backtest_date]
+                    if not day_prices.empty:
+                        st.line_chart(day_prices.groupby("hour_ending")["da_lmp"].mean(), 
+                                     use_container_width=True)
+                        st.caption("Average DA LMP across nodes for this date")
+    
+    with tab4:
         st.subheader("🧠 Natural Language Rule Builder")
         st.markdown("""
         Describe a rule in plain English and AI will translate it into a structured rule definition.
@@ -500,7 +599,7 @@ def page_issue_log():
         return
     
     # Filters
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         filter_severity = st.multiselect("Severity", ["RED", "YELLOW"], default=["RED", "YELLOW"], key="log_sev")
     with col2:
@@ -510,9 +609,6 @@ def page_issue_log():
         filter_resource = st.multiselect("Resource", list(resources["resource_name"].values),
                                         default=list(resources["resource_name"].values), key="log_res")
     with col4:
-        available_markets = list(alerts["market"].unique()) if "market" in alerts.columns else ["DA", "RT"]
-        filter_market = st.multiselect("Market", available_markets, default=available_markets, key="log_mkt")
-    with col5:
         filter_rule = st.multiselect("Rule", list(alerts["rule_id"].unique()), 
                                     default=list(alerts["rule_id"].unique()), key="log_rule")
     
