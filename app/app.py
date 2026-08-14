@@ -11,6 +11,7 @@ import json
 import os
 import uuid as uuid_mod
 from pathlib import Path
+import altair as alt
 
 # --- Data Layer (local CSV + session state) ---
 DATA_DIR = Path(__file__).parent / "data"
@@ -244,16 +245,12 @@ def page_resource_detail():
                     st.info(f"💡 **Recommended Action:** {rule_info.iloc[0]['recommended_action']}")
                 
                 # Action buttons
-                col_a, col_b, col_c = st.columns(3)
+                col_a, col_b, col_c, col_d = st.columns(4)
                 with col_a:
                     if st.button("✅ Acknowledge", key=f"ack_{alert['alert_id']}"):
-                        run_update(f"""
-                            UPDATE {table_name('alerts')}
-                            SET status = 'ACKNOWLEDGED', 
-                                acknowledged_by = 'current_user',
-                                acknowledged_at = current_timestamp()
-                            WHERE alert_id = '{alert['alert_id']}'
-                        """)
+                        update_alert(alert['alert_id'], status='ACKNOWLEDGED',
+                                    acknowledged_by='current_user',
+                                    acknowledged_at=datetime.now().isoformat())
                         st.success("Alert acknowledged!")
                         st.rerun()
                 with col_b:
@@ -262,19 +259,25 @@ def page_resource_detail():
                 with col_c:
                     if st.button("🚫 Suppress", key=f"sup_{alert['alert_id']}"):
                         st.session_state[f"suppressing_{alert['alert_id']}"] = True
+                with col_d:
+                    if st.button("🔍 Investigate", key=f"inv_{alert['alert_id']}"):
+                        st.session_state[f"investigating_{alert['alert_id']}"] = \
+                            not st.session_state.get(f"investigating_{alert['alert_id']}", False)
+                
+                # Investigation chart
+                if st.session_state.get(f"investigating_{alert['alert_id']}", False):
+                    st.markdown("---")
+                    render_investigation_chart(alert, selected_id, resources)
+                    st.markdown("---")
                 
                 # Resolution form
                 if st.session_state.get(f"resolving_{alert['alert_id']}"):
                     notes = st.text_area("Resolution notes:", key=f"notes_{alert['alert_id']}")
                     if st.button("Submit Resolution", key=f"submit_res_{alert['alert_id']}"):
-                        run_update(f"""
-                            UPDATE {table_name('alerts')}
-                            SET status = 'RESOLVED',
-                                resolved_by = 'current_user',
-                                resolved_at = current_timestamp(),
-                                resolution_notes = '{notes}'
-                            WHERE alert_id = '{alert['alert_id']}'
-                        """)
+                        update_alert(alert['alert_id'], status='RESOLVED',
+                                    resolved_by='current_user',
+                                    resolved_at=datetime.now().isoformat(),
+                                    resolution_notes=notes)
                         st.session_state[f"resolving_{alert['alert_id']}"] = False
                         st.success("Alert resolved!")
                         st.rerun()
@@ -350,20 +353,12 @@ def page_rules_management():
     tab1, tab2, tab3, tab4 = st.tabs(["📜 Active Rules", "➕ Create Rule", "🔍 Backtest Rule", "🧠 AI Rule Builder"])
     
     with tab1:
-        # DA/RT filter for rules list
-        rules_data_req_filter = st.multiselect("Filter by Rule Type", ["DA", "RT"], default=["DA", "RT"],
-                                               help="DA = evaluable from Day-Ahead data only; RT = requires real-time actuals/telemetry",
-                                               key="rules_mgmt_data_req")
-        
         if not rules.empty:
-            filtered_rules = rules[rules["data_requirement"].isin(rules_data_req_filter)] if "data_requirement" in rules.columns else rules
-            for _, rule in filtered_rules.iterrows():
+            for _, rule in rules.iterrows():
                 status_icon = "✅" if rule["is_active"] else "❌"
                 severity_badge = f"🔴 {rule['severity']}" if rule["severity"] == "RED" else f"🟡 {rule['severity']}"
-                data_req_badge = f"📅 DA" if rule.get("data_requirement") == "DA" else f"⏱️ RT"
                 
-                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{severity_badge}] [{data_req_badge}]"):
-                    st.markdown(f"**Data Requirement:** {'📅 Day-Ahead — can be evaluated from DA data alone' if rule.get('data_requirement') == 'DA' else '⏱️ Real-Time — requires actuals, meter reads, or SOC telemetry'}")
+                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{severity_badge}]"):
                     st.markdown(f"**Condition:** `{rule['condition_expression']}`")
                     st.markdown(f"**Action:** {rule['recommended_action']}")
                     st.markdown(f"**Applies to:** {rule['applies_to_types']}")
@@ -393,6 +388,8 @@ def page_rules_management():
             rule_id = st.text_input("Rule ID (e.g., E6, D3, S4)")
             rule_name = st.text_input("Rule Name")
             severity = st.selectbox("Severity", ["RED", "YELLOW"])
+            data_requirement = st.selectbox("Data Requirement", ["DA", "RT"],
+                                           help="DA = rule can be evaluated from Day-Ahead data alone (bids, awards); RT = requires real-time actuals, meter reads, or SOC telemetry")
             market = st.selectbox("Market", ["DA", "RT", "AS"])
             condition = st.text_area("Condition Expression", 
                                    placeholder="e.g., actual_mw > 5 AND da_lmp < -30 AND soc_pct < 15")
@@ -441,8 +438,7 @@ def page_rules_management():
                     "applies_to_types": applies_str, "is_active": True,
                     "created_at": datetime.now().isoformat(),
                     "updated_at": datetime.now().isoformat(), "created_by": "user",
-                    "resource_ids": resource_ids_str,
-                    "data_requirement": data_requirement
+                    "resource_ids": resource_ids_str
                 }])
                 st.session_state["rules"] = pd.concat([rules_df, new_rule], ignore_index=True)
                 scope_msg = "All resources" if resource_ids_str == "ALL" else \
