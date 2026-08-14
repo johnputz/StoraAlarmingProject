@@ -98,13 +98,21 @@ def page_dashboard():
     open_alerts = alerts[alerts["status"] == "OPEN"] if not alerts.empty else pd.DataFrame()
     
     # Filter controls
-    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
     with col_f1:
         type_filter = st.multiselect("Resource Type", ["solar", "battery", "hybrid"], default=["solar", "battery", "hybrid"])
     with col_f2:
         status_filter = st.multiselect("Status", ["GREEN", "YELLOW", "RED"], default=["GREEN", "YELLOW", "RED"])
     with col_f3:
+        data_req_filter = st.multiselect("Rule Type", ["DA", "RT"], default=["DA", "RT"], 
+                                         help="DA = Day-Ahead only, RT = Requires real-time/actuals")
+    with col_f4:
         st.markdown(f"**Last evaluated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    
+    # Filter alerts by rule data_requirement
+    rules = load_rules()
+    da_rules = set(rules[rules.get("data_requirement", pd.Series(dtype=str)).isin(data_req_filter)]["rule_id"].values) if "data_requirement" in rules.columns else set(rules["rule_id"].values)
+    open_alerts = open_alerts[open_alerts["rule_id"].isin(da_rules)] if not open_alerts.empty else open_alerts
     
     st.markdown("---")
     
@@ -180,9 +188,6 @@ def page_dashboard():
 # PAGE: RESOURCE DETAIL (Drill-Down)
 # ============================================================
 def page_resource_detail():
-    if st.button("← Back to Dashboard", key="back_to_dash"):
-        st.session_state["page"] = "Dashboard"
-        st.rerun()
     st.title("🔍 Resource Detail")
     
     resources = load_resources()
@@ -345,12 +350,20 @@ def page_rules_management():
     tab1, tab2, tab3, tab4 = st.tabs(["📜 Active Rules", "➕ Create Rule", "🔍 Backtest Rule", "🧠 AI Rule Builder"])
     
     with tab1:
+        # DA/RT filter for rules list
+        rules_data_req_filter = st.multiselect("Filter by Rule Type", ["DA", "RT"], default=["DA", "RT"],
+                                               help="DA = evaluable from Day-Ahead data only; RT = requires real-time actuals/telemetry",
+                                               key="rules_mgmt_data_req")
+        
         if not rules.empty:
-            for _, rule in rules.iterrows():
+            filtered_rules = rules[rules["data_requirement"].isin(rules_data_req_filter)] if "data_requirement" in rules.columns else rules
+            for _, rule in filtered_rules.iterrows():
                 status_icon = "✅" if rule["is_active"] else "❌"
                 severity_badge = f"🔴 {rule['severity']}" if rule["severity"] == "RED" else f"🟡 {rule['severity']}"
+                data_req_badge = f"📅 DA" if rule.get("data_requirement") == "DA" else f"⏱️ RT"
                 
-                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{severity_badge}]"):
+                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{severity_badge}] [{data_req_badge}]"):
+                    st.markdown(f"**Data Requirement:** {'📅 Day-Ahead — can be evaluated from DA data alone' if rule.get('data_requirement') == 'DA' else '⏱️ Real-Time — requires actuals, meter reads, or SOC telemetry'}")
                     st.markdown(f"**Condition:** `{rule['condition_expression']}`")
                     st.markdown(f"**Action:** {rule['recommended_action']}")
                     st.markdown(f"**Applies to:** {rule['applies_to_types']}")
@@ -428,7 +441,8 @@ def page_rules_management():
                     "applies_to_types": applies_str, "is_active": True,
                     "created_at": datetime.now().isoformat(),
                     "updated_at": datetime.now().isoformat(), "created_by": "user",
-                    "resource_ids": resource_ids_str
+                    "resource_ids": resource_ids_str,
+                    "data_requirement": data_requirement
                 }])
                 st.session_state["rules"] = pd.concat([rules_df, new_rule], ignore_index=True)
                 scope_msg = "All resources" if resource_ids_str == "ALL" else \
