@@ -346,7 +346,25 @@ notification_config
 
 ---
 
-## 13. Next Steps (Immediate)
+## 13. Stakeholder Feedback (Round 1)
+
+The following requirements emerged from initial prototype review:
+
+### F1: Per-Resource Rule Assignment
+Rules should be assignable to specific individual resources (not just by resource type). A rule can apply to one, several, or all resources. The UI should allow multi-select of resources when creating/editing a rule.
+
+### F2: Rule Backtesting
+After creating or modifying a rule, the user should be able to navigate to a specific historical date/time and confirm that the rule would have (or did) fire as expected. This validates rule logic before putting it into production monitoring.
+
+### F3: Stora Charting Integration (Production)
+When the tool is integrated within Stora, clicking on an alert should take the user to Stora's main charting page, zoomed to the time period when the rule fired, with the chart highlighting where the violation(s) occurred. (Production-only feature; cannot be prototyped without Stora access.)
+
+### F4: Market Filter & After-the-Fact Review
+Alerts should be tagged with the market they relate to (DA, RT, AS). Users should be able to filter the issue log and dashboard by market. Key use case: DA rules that fire over the weekend (e.g., DA award anomalies on Saturday/Sunday) need to be easily reviewable on Monday morning — filter by market = DA, date range = weekend, status = OPEN.
+
+---
+
+## 14. Next Steps (Immediate)
 
 1. Review this document with stakeholders and confirm scope boundaries.
 2. Begin Phase 0 discovery (resource inventory, data source documentation).

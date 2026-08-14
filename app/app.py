@@ -339,7 +339,7 @@ def page_rules_management():
     rules = load_rules()
     
     # Tabs for list vs. create
-    tab1, tab2, tab3 = st.tabs(["📜 Active Rules", "➕ Create Rule", "🧠 AI Rule Builder"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📜 Active Rules", "➕ Create Rule", "🔍 Backtest Rule", "🧠 AI Rule Builder"])
     
     with tab1:
         if not rules.empty:
@@ -500,7 +500,7 @@ def page_issue_log():
         return
     
     # Filters
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         filter_severity = st.multiselect("Severity", ["RED", "YELLOW"], default=["RED", "YELLOW"], key="log_sev")
     with col2:
@@ -510,6 +510,9 @@ def page_issue_log():
         filter_resource = st.multiselect("Resource", list(resources["resource_name"].values),
                                         default=list(resources["resource_name"].values), key="log_res")
     with col4:
+        available_markets = list(alerts["market"].unique()) if "market" in alerts.columns else ["DA", "RT"]
+        filter_market = st.multiselect("Market", available_markets, default=available_markets, key="log_mkt")
+    with col5:
         filter_rule = st.multiselect("Rule", list(alerts["rule_id"].unique()), 
                                     default=list(alerts["rule_id"].unique()), key="log_rule")
     
