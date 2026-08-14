@@ -112,8 +112,22 @@ def page_dashboard():
     
     # Filter alerts by rule data_requirement
     rules = load_rules()
-    da_rules = set(rules[rules.get("data_requirement", pd.Series(dtype=str)).isin(data_req_filter)]["rule_id"].values) if "data_requirement" in rules.columns else set(rules["rule_id"].values)
+    if "data_requirement" in rules.columns:
+        matching_rules = rules[rules["data_requirement"].isin(data_req_filter)]
+        da_rules = set(matching_rules["rule_id"].values)
+    else:
+        da_rules = set(rules["rule_id"].values)
     open_alerts = open_alerts[open_alerts["rule_id"].isin(da_rules)] if not open_alerts.empty else open_alerts
+    
+    # Filter summary
+    total_open = len(open_alerts)
+    filter_desc = []
+    if set(type_filter) != {"solar", "battery", "hybrid"}:
+        filter_desc.append(f"Types: {', '.join(type_filter)}")
+    if set(data_req_filter) != {"DA", "RT"}:
+        filter_desc.append(f"Rule Type: {', '.join(data_req_filter)} only")
+    if filter_desc:
+        st.info(f"🔍 **Active filters:** {' | '.join(filter_desc)} — showing {total_open} matching open alerts")
     
     st.markdown("---")
     
