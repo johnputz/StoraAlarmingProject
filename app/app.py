@@ -474,6 +474,9 @@ def page_resource_detail():
 # PAGE: RULES MANAGEMENT
 # ============================================================
 def page_rules_management():
+    if st.button("\u2190 Back to Dashboard", key="back_rules"):
+        st.session_state["page"] = "Dashboard"
+        st.rerun()
     st.title("\u2699\ufe0f Rules Management")
     rules = load_rules()
 
@@ -602,6 +605,9 @@ def page_rules_management():
 # PAGE: NOTIFICATION CONFIG
 # ============================================================
 def page_notification_config():
+    if st.button("\u2190 Back to Dashboard", key="back_notif"):
+        st.session_state["page"] = "Dashboard"
+        st.rerun()
     st.title("\U0001f514 Notification Configuration")
     configs = get_notification_config()
     resources = load_resources()
@@ -651,6 +657,9 @@ def page_notification_config():
 # PAGE: ISSUE LOG
 # ============================================================
 def page_issue_log():
+    if st.button("\u2190 Back to Dashboard", key="back_log"):
+        st.session_state["page"] = "Dashboard"
+        st.rerun()
     st.title("\U0001f4cb Issue Log")
     alerts = load_alerts()
     resources = load_resources()
