@@ -69,13 +69,8 @@ PAGES = ["Dashboard", "Resource Detail", "Rules Management", "Notification Confi
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "Dashboard"
 
-# Track previous page for back navigation
-if "previous_page" not in st.session_state:
-    st.session_state["previous_page"] = "Dashboard"
-
 # If a button set "page", sync to current_page AND to the radio widget key
 if "page" in st.session_state:
-    st.session_state["previous_page"] = st.session_state["current_page"]
     st.session_state["current_page"] = st.session_state.pop("page")
     st.session_state["nav_radio"] = st.session_state["current_page"]
 
@@ -85,8 +80,6 @@ page = st.sidebar.radio(
     key="nav_radio"
 )
 # Sidebar click updates current_page
-if page != st.session_state["current_page"]:
-    st.session_state["previous_page"] = st.session_state["current_page"]
 st.session_state["current_page"] = page
 
 # --- Load Common Data ---
@@ -355,8 +348,8 @@ def page_dashboard():
 # PAGE: RESOURCE DETAIL
 # ============================================================
 def page_resource_detail():
-    if st.button("\u2190 Back", help="Return to previous page"):
-        st.session_state["page"] = st.session_state.get("previous_page", "Dashboard")
+    if st.button("\u2190 Back to Dashboard"):
+        st.session_state["page"] = "Dashboard"
         st.rerun()
     st.title("\U0001f50d Resource Detail")
     
@@ -481,8 +474,8 @@ def page_resource_detail():
 # PAGE: RULES MANAGEMENT
 # ============================================================
 def page_rules_management():
-    if st.button("\u2190 Back", key="back_rules", help="Return to previous page"):
-        st.session_state["page"] = st.session_state.get("previous_page", "Dashboard")
+    if st.button("\u2190 Back to Dashboard", key="back_rules"):
+        st.session_state["page"] = "Dashboard"
         st.rerun()
     st.title("\u2699\ufe0f Rules Management")
     rules = load_rules()
@@ -612,8 +605,8 @@ def page_rules_management():
 # PAGE: NOTIFICATION CONFIG
 # ============================================================
 def page_notification_config():
-    if st.button("\u2190 Back", key="back_notif", help="Return to previous page"):
-        st.session_state["page"] = st.session_state.get("previous_page", "Dashboard")
+    if st.button("\u2190 Back to Dashboard", key="back_notif"):
+        st.session_state["page"] = "Dashboard"
         st.rerun()
     st.title("\U0001f514 Notification Configuration")
     configs = get_notification_config()
@@ -664,8 +657,8 @@ def page_notification_config():
 # PAGE: ISSUE LOG
 # ============================================================
 def page_issue_log():
-    if st.button("\u2190 Back", key="back_log", help="Return to previous page"):
-        st.session_state["page"] = st.session_state.get("previous_page", "Dashboard")
+    if st.button("\u2190 Back to Dashboard", key="back_log"):
+        st.session_state["page"] = "Dashboard"
         st.rerun()
     st.title("\U0001f4cb Issue Log")
     alerts = load_alerts()
