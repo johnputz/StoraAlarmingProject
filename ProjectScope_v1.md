@@ -364,7 +364,66 @@ Alerts should be tagged with the market they relate to (DA, RT, AS). Users shoul
 
 ---
 
-## 14. Next Steps (Immediate)
+## 14. Additional Requirements (Surfaced During Prototype Build)
+
+The following requirements emerged during prototype implementation and stakeholder interaction beyond the Round 1 items above:
+
+### F5: DA/RT Data Requirement Classification
+
+Each rule should be labeled with a **data requirement** indicating whether it can be evaluated from Day-Ahead data alone (DA) or requires real-time actuals/telemetry (RT). This classification:
+- Appears as a badge on each rule in the Rules Management view (📅 DA or ⏱️ RT)
+- Powers a "Rule Type" filter on the Dashboard (so users can view only DA-triggered alerts or only RT-triggered alerts)
+- Is set at rule creation time via a dropdown
+- Enables the Monday-morning workflow from F4: filter Dashboard to DA-only to review weekend DA anomalies without noise from RT rules that haven't evaluated yet
+
+### F6: Contextual Investigation Charts
+
+Each active alert should have an **Investigate** button that expands an inline time-series chart showing the data context around the alert, with fired hours highlighted. Chart type varies by rule category:
+- **Energy rules (E1/E2/E3):** Dual panel — actual generation (MW) + LMP prices (DA and RT), with SOC area chart
+- **Bid rules (E4):** Bids vs. awards bar chart for the operating date (or "no bids found" confirmation)
+- **Award rules (E5):** Bids vs. awards comparison highlighting discrepancy hours
+- **Dispatch rules (D1/D2):** Actual MW vs. dispatch instruction lines + nameplate reference line
+- **SOC rules (S1/S2/S3):** SOC percentage area chart + meter activity bars
+
+All charts show red semi-transparent bands on hours when the rule fired. This serves as a lightweight investigation tool in the prototype; in production, it complements F3 (Stora charting deep-link) rather than replacing it.
+
+### F7: Market Tagging on Alerts
+
+Each alert record carries a `market` field (DA or RT) derived from the rule's data requirement classification. This field:
+- Powers the Market filter on the Issue Log page
+- Enables grouping/sorting alerts by market context
+- Supports the F4 use case of filtering to DA-only alerts for weekend review
+
+### F8: E5 Rule — DA Award Exceeds Bid Quantity
+
+Added as a concrete second DA-evaluable rule (complements E4). Fires when the awarded MW for an hour exceeds the bid quantity submitted, indicating a possible data issue or partial/over-award from the ISO. Severity: YELLOW.
+
+### F9: In-Page Navigation (Back Buttons)
+
+All non-Dashboard pages include a "← Back to Dashboard" button at the top for quick return to the hub view. The Dashboard is the central navigation point; the sidebar also provides direct access to any page.
+
+### F10: Contextual Help Expanders
+
+Each page includes a collapsible "ℹ️ How to use..." section (collapsed by default) explaining:
+- What the page's filters and controls do
+- What the action buttons mean (e.g., Acknowledge vs. Resolve vs. Suppress)
+- Workflow tips (e.g., "filter to DA + weekend dates for Monday review")
+
+Designed for first-time users and stakeholder reviewers; experienced users can ignore the collapsed sections.
+
+### F11: Per-Page Tabs in Rules Management
+
+The Rules Management page is organized into four tabs within a single page (not separate pages):
+1. **Active Rules** — view, filter (DA/RT), enable/disable
+2. **Create Rule** — full rule builder with assignment scope (All / By Type / Specific Resources)
+3. **Backtest Rule** — select rule + date to verify historical firing (implements F2)
+4. **AI Rule Builder** — natural-language rule authoring placeholder (from §8 original spec)
+
+Navigation between tabs is via clicking the tab headers, not via Back buttons or page navigation.
+
+---
+
+## 15. Next Steps (Immediate)
 
 1. Review this document with stakeholders and confirm scope boundaries.
 2. Begin Phase 0 discovery (resource inventory, data source documentation).
