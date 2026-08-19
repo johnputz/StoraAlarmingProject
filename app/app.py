@@ -430,11 +430,11 @@ def page_dashboard():
         yellow_count = len(res_alerts[res_alerts["severity"] == "YELLOW"]) if not res_alerts.empty else 0
 
         if red_count > 0:
-            status, status_color, status_emoji = "RED", "#FF4B4B", "\U0001f534"
+            status, status_color = "RED", "#FF4B4B"
         elif yellow_count > 0:
-            status, status_color, status_emoji = "YELLOW", "#FFA500", "\U0001f7e1"
+            status, status_color = "YELLOW", "#FFA500"
         else:
-            status, status_color, status_emoji = "GREEN", "#00CC66", "\U0001f7e2"
+            status, status_color = "GREEN", "#00CC66"
 
         if status not in status_filter:
             continue
@@ -446,7 +446,7 @@ def page_dashboard():
             st.markdown(f"""
             <div style="border: 3px solid {status_color}; border-radius: 12px; padding: 20px;
                         text-align: center; background: linear-gradient(135deg, {status_color}15, {status_color}05);">
-                <h2 style="margin:0;">{status_emoji}</h2>
+                <h2 style="margin:0; color:{status_color};">&#11044;</h2>
                 <h3 style="margin:5px 0; height:2.8em; display:flex; align-items:center; justify-content:center;">{type_icon} {res['resource_name']}</h3>
                 <p style="color:gray; margin:2px 0;">{res['resource_type'].title()} | {res['nameplate_mw']:.0f} MW</p>
                 <p style="color:gray; margin:2px 0;">{res.get('company', res['client_name'])}</p>
