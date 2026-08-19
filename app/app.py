@@ -618,13 +618,18 @@ def page_rules_management():
     tab1, tab2, tab3, tab4 = st.tabs(["\U0001f4dc Active Rules", "\u2795 Create Rule", "\U0001f50d Backtest Rule", "\U0001f9e0 AI Rule Builder"])
 
     with tab1:
-        # DA/RT filter
-        rules_filter = st.multiselect("Filter by Rule Type", ["DA", "RT"], default=["DA", "RT"],
-                                      help="DA = Day-Ahead only, RT = Real-time", key="rules_tab_filter")
+        # Filters: DA/RT + Production/Prototype
+        rf1, rf2 = st.columns(2)
+        with rf1:
+            rules_filter = st.multiselect("Filter by Rule Type", ["DA", "RT"], default=["DA", "RT"],
+                                          help="DA = Day-Ahead only, RT = Real-time", key="rules_tab_filter")
+        with rf2:
+            rules_status_filter = st.multiselect("Filter by Status", ["production", "prototype"],
+                                                 default=["production", "prototype"],
+                                                 help="Production = fires alerts; Prototype = testing only",
+                                                 key="rules_status_filter")
         if not rules.empty:
             display_rules = rules[rules["data_requirement"].isin(rules_filter)] if "data_requirement" in rules.columns else rules
-            if "rule_status" in display_rules.columns:
-                display_rules = display_rules[display_rules["rule_status"].isin(rules_status_filter)]
             if "rule_status" in display_rules.columns:
                 display_rules = display_rules[display_rules["rule_status"].isin(rules_status_filter)]
             for _, rule in display_rules.iterrows():
@@ -632,8 +637,18 @@ def page_rules_management():
                 sev_badge = "\U0001f534 RED" if rule["severity"] == "RED" else "\U0001f7e1 YELLOW"
                 dr_badge = "\U0001f4c5 DA" if rule.get("data_requirement") == "DA" else "\u23f1\ufe0f RT"
 
-                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{sev_badge}] [{dr_badge}]"):
-                    st.markdown(f"**Data Requirement:** {'\U0001f4c5 Day-Ahead' if rule.get('data_requirement') == 'DA' else '\u23f1\ufe0f Real-Time'}")
+                rs = rule.get("rule_status", "production")
+                rs_badge = "\U0001f6a7 PROTO" if rs == "prototype" else "\u2705 PROD"
+                with st.expander(f"{status_icon} {rule['rule_id']}: {rule['rule_name']} [{sev_badge}] [{dr_badge}] [{rs_badge}]"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.markdown(f"**Data Req:** {'\U0001f4c5 DA' if rule.get('data_requirement') == 'DA' else '\u23f1\ufe0f RT'}")
+                    with c2:
+                        st.markdown(f"**Author:** {rule.get('created_by', 'Unknown')}")
+                    with c3:
+                        st.markdown(f"**Status:** {'\U0001f6a7 Prototype' if rs == 'prototype' else '\u2705 Production'}")
+                    if rs == "prototype":
+                        st.caption("\U0001f6a7 This rule is in prototype mode \u2014 will not generate alerts until promoted to production.")
                     st.markdown(f"**Condition:** `{rule['condition_expression']}`")
                     st.markdown(f"**Action:** {rule['recommended_action']}")
                     st.markdown(f"**Applies to:** {rule['applies_to_types']}")
