@@ -120,14 +120,20 @@ def render_investigation_chart(alert, resource_id, resources):
     st.markdown(f"### \U0001f50d Investigation: {rule_id} on {op_date}")
     st.markdown(f"**Resource:** {res_info['resource_name']} | **Fired hours:** HE {', '.join(str(h) for h in sorted(fired_hours))}")
 
-    if rule_id.startswith("E") and rule_id != "E4":
+    if rule_id.startswith("E") and rule_id not in ["E4", "E5"]:
         _render_energy_chart(resource_id, node, op_date, highlight_df)
-    elif rule_id == "E4":
+    elif rule_id in ["E4", "E5", "T6", "T7", "R1", "R2", "R3"]:
         _render_bid_chart(resource_id, op_date)
-    elif rule_id.startswith("D"):
+    elif rule_id.startswith("D") or rule_id == "T1":
         _render_dispatch_chart(resource_id, op_date, highlight_df, nameplate)
-    elif rule_id.startswith("S"):
+    elif rule_id.startswith("S") or rule_id in ["T2", "T4"]:
         _render_soc_chart(resource_id, op_date, highlight_df)
+    elif rule_id in ["T3", "T5"]:
+        _render_curtailment_chart(resource_id, node, op_date, highlight_df, nameplate)
+    elif rule_id == "T10":
+        _render_grid_charging_chart(resource_id, op_date, highlight_df)
+    elif rule_id == "T11":
+        _render_forecast_accuracy_chart(resource_id, node, op_date, highlight_df)
     else:
         st.info("No investigation chart available for this rule type.")
 
