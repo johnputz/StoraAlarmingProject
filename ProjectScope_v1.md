@@ -585,13 +585,3 @@ The trader rules require the following data extensions beyond the original proto
 ---
 
 *This is a living document. Version history will be tracked in the workspace.*
-
-1. Review this document with stakeholders and confirm scope boundaries.
-2. Begin Phase 0 discovery (resource inventory, data source documentation).
-3. Identify prototype technology choice (Databricks App vs. AI/BI Dashboard).
-4. Assign owners to discovery tasks.
-5. Schedule kickoff meeting for prototype development (Phase 1).
-
----
-
-*This is a living document. Version history will be tracked in the workspace.*
