@@ -396,12 +396,13 @@ def page_dashboard():
     with col_f5:
         st.markdown(f"**Last evaluated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-    # Apply DA/RT filter to alerts
+    # Apply DA/RT filter to alerts; exclude prototype rules from alerting
     rules = load_rules()
-    if "data_requirement" in rules.columns:
-        matching_rule_ids = set(rules[rules["data_requirement"].isin(data_req_filter)]["rule_id"].values)
+    production_rules = rules[rules.get("rule_status", pd.Series(["production"]*len(rules))) == "production"] if "rule_status" in rules.columns else rules
+    if "data_requirement" in production_rules.columns:
+        matching_rule_ids = set(production_rules[production_rules["data_requirement"].isin(data_req_filter)]["rule_id"].values)
     else:
-        matching_rule_ids = set(rules["rule_id"].values)
+        matching_rule_ids = set(production_rules["rule_id"].values)
     if not open_alerts.empty:
         open_alerts = open_alerts[open_alerts["rule_id"].isin(matching_rule_ids)]
 
@@ -622,6 +623,10 @@ def page_rules_management():
                                       help="DA = Day-Ahead only, RT = Real-time", key="rules_tab_filter")
         if not rules.empty:
             display_rules = rules[rules["data_requirement"].isin(rules_filter)] if "data_requirement" in rules.columns else rules
+            if "rule_status" in display_rules.columns:
+                display_rules = display_rules[display_rules["rule_status"].isin(rules_status_filter)]
+            if "rule_status" in display_rules.columns:
+                display_rules = display_rules[display_rules["rule_status"].isin(rules_status_filter)]
             for _, rule in display_rules.iterrows():
                 status_icon = "\u2705" if rule["is_active"] else "\u274c"
                 sev_badge = "\U0001f534 RED" if rule["severity"] == "RED" else "\U0001f7e1 YELLOW"

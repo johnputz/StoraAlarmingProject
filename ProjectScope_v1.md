@@ -421,6 +421,24 @@ The Rules Management page is organized into four tabs within a single page (not 
 
 Navigation between tabs is via clicking the tab headers, not via Back buttons or page navigation.
 
+### F12: Rule Status (Production / Prototype)
+
+Each rule carries a **rule_status** field:
+- **Production** — rule is fully active; alerts fire normally and appear on the Dashboard, Resource Detail, and Issue Log.
+- **Prototype** — rule is visible in Rules Management (for review, backtesting, and iteration) but does NOT generate alerts. This allows new rules to be defined, discussed, and validated via backtesting before "going live." Promotes clean separation between proven operational rules and experimental ones.
+
+In the Rules Management Active Rules tab, each rule shows a badge: ✅ PROD or 🚧 PROTO. A status filter allows toggling visibility. The Create Rule form defaults new rules to "prototype" so they can be tested before promotion.
+
+Future: a "Promote to Production" button on each prototype rule (with confirmation dialog).
+
+### F13: Rule Author Attribution
+
+Each rule stores a **created_by** (author) field displayed in the Rules Management view. In the prototype:
+- Demo rules (E-series): authored by "Homer Simpson"
+- Trader-identified rules (T/R-series): authored by "Brian Wynn"
+
+In production, this will default to the currently logged-in user when creating a new rule. The author field supports accountability and makes it easy to identify who to ask about a rule's intent or tuning.
+
 ---
 
 ## 15. Trader-Identified Rules (Stora Checks Spreadsheet)
