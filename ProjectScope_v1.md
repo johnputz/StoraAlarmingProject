@@ -423,7 +423,168 @@ Navigation between tabs is via clicking the tab headers, not via Back buttons or
 
 ---
 
-## 15. Next Steps (Immediate)
+## 15. Trader-Identified Rules (Stora Checks Spreadsheet)
+
+The following rules were identified by the trading team from actual operational monitoring needs. Source document: "STORA Checks.xlsx".
+
+### 15.1 Resource Portfolio & Company Filtering
+
+Resources now carry a **company (owner)** field. The Dashboard supports filtering by company so users can isolate a single client's fleet. This also enables a "demo mode" where fictional resources (Burns Industries) can be shown to stakeholders without exposing real client names.
+
+#### Production Resources (Owner: TEA)
+
+| Resource ID | Inferred Type | Site | Nameplate MW |
+| --- | --- | --- | --- |
+| ARCATA_6_FCPSB1 | BESS | Arcata | 100 |
+| ARCATA_6_FCPSB2 | BESS | Arcata | 100 |
+| DSFLWR_2_W9CSB2 | BESS | Desert Flower | 100 |
+| JANCRK_6_RCABT1 | BESS | January Creek | 100 |
+| PUTHCR_1_PCNSB1 | BESS | Putah Creek | 100 |
+| KRAMER_1_R1BX3 | BESS (co-located) | Kramer | 100 |
+| KRAMER_1_R1PX3 | Solar (co-located) | Kramer | 75 |
+| RSMNDS_2_CSRBT1 | BESS (co-located) | Rosamond | 100 |
+| RSMNDS_2_CSRSR1 | Solar (co-located) | Rosamond | 75 |
+| SANDRN_2_SS1BT1 | BESS (co-located) | San Bernardino | 100 |
+| SANDRN_2_SS1SR1 | Solar (co-located) | San Bernardino | 75 |
+
+Co-located sites (Kramer, Rosamond, San Bernardino) have paired BESS + Solar resources at the same facility.
+
+#### Demo Resources (Owner: Burns Industries)
+
+The 4 original Simpsons-themed resources remain for demonstration purposes:
+- RES-001 Springfield Solar (solar, 50 MW)
+- RES-002 Burns Battery (battery, 100 MW / 400 MWh)
+- RES-003 Shelbyville Sun & Store (hybrid, 75 MW / 200 MWh)
+- RES-004 Krusty's Clean Energy (hybrid, 60 MW / 150 MWh)
+
+### 15.2 Rules Applying to All Resources
+
+#### T1: Dispatch Following (Enhanced) — RT
+**Condition:** Resource actual MW deviates from dispatch instruction by > 10% (or 5 MW, whichever is greater) for 3 or more consecutive 5-minute intervals. Ignore if resource has an active Regulation (REG) award for that interval.
+**Inputs:** Awards (to check for REG), generation/meter data (actual MW at POI)
+**Intent:** Detect non-compliance before CAISO calls
+**Action:** If related to SOC at zero during non-solar hours → submit outage card. Otherwise → contact the plant.
+**Note:** This is an enhanced version of the prototype's D1 rule, adding the 3-interval persistence requirement and the REG exclusion.
+
+#### T2: BESS Not Cycling — RT
+**Condition:** Battery SOC shows no charge/discharge cycling (i.e., SOC moves in only one direction or stays flat) over a rolling 8-hour window during operating hours.
+**Inputs:** SOC readings
+**Intent:** Check that the battery is being charged and discharged throughout the day
+**Action:** Check if related to an outage; otherwise ping the DA market team.
+
+#### T3: Curtailment Detection — RT
+**Condition:** Variable Energy Resource (VER) forecast significantly exceeds actual generation (VER - Actual > 10 MW or > 20% of VER forecast), indicating the resource is being curtailed.
+**Inputs:** VER forecast capacity, actual generation
+**Intent:** Check if resources are being curtailed
+**Action:** Informational — NA
+
+#### T4: SOC Outside Target Bounds — DA
+**Condition:** SOC is above the resource's configured SOC max target or below SOC min target at the end of the DA optimization horizon (i.e., routinely exceeding planned bounds).
+**Inputs:** Stora live feeds / SOC readings, per-resource SOC min/max targets
+**Intent:** Check if the optimization model is routinely exceeding its own targets
+**Action:** Informational — review model parameters
+
+#### T5: Uneconomic PV Curtailment — RT
+**Condition:** Resource is being curtailed (VER > actual generation) AND real-time LMP is above the resource's curtailment bid price.
+**Inputs:** RT bids, RT market prices, VER capacity, PV generation
+**Intent:** Check if curtailment is happening when it shouldn't be (leaving money on the table)
+**Action:** Contact DA Org Market Team
+
+#### T6: Invalid Bids — Both (DA & RT)
+**Condition:** Any bid submission returns an INVALID status from the market.
+**Inputs:** Bid status responses from CAISO
+**Intent:** Ensure STORA is creating feasible bids
+**Action:** Contact DA Org Market Team
+
+#### T7: RT Bids Not Updated Forward — RT
+**Condition:** No RT bid submissions found covering the next 6 hours from current time.
+**Inputs:** Bid submission timestamps and target hours
+**Intent:** Ensure STORA is continuously updating RT bids on a rolling basis
+**Action:** Contact DA Org Market Team
+
+#### T8: Point Data Out of Range — DEFERRED
+**Condition:** "Is point data out of allowed range of outcomes"
+**Inputs:** "Point data"
+**Intent:** See if bad input data is leading to bad optimization outcomes
+**Status:** DEFERRED — unclear what "point data" refers to. Open questions:
+- Is this SCADA telemetry points (MW, voltage, frequency)?
+- Is this forecast input data (price forecasts, load forecasts)?
+- Is this bid parameter points (bid curve segments)?
+- What are the "allowed ranges" — configured per-resource? Per-data-type?
+
+#### T9: Optimization Quality (Hindsight Analysis) — DEFERRED
+**Condition:** "Is STORA optimizing DA products (DA Energy, Capacity) vs RT energy prices with correct assumptions"
+**Inputs:** LMP data vs hindsight analysis
+**Intent:** Validate that optimization is within respectable results
+**Status:** DEFERRED — this is more of a periodic performance scorecard than a real-time alert rule. It requires a hindsight P&L analysis comparing DA bidding decisions against realized RT prices. Recommended to implement as a weekly/monthly analytics report rather than a boolean firing rule. Open questions:
+- What threshold of "suboptimal" should trigger a flag?
+- What's the benchmark — perfect foresight? Simple heuristic?
+- Is this per-hour, per-day, or over a rolling window?
+
+#### T10: Grid Charging Detection — RT
+**Condition:** Battery is charging during hours when co-located solar is not producing (night hours or VER = 0), indicating grid charging.
+**Inputs:** Charge energy (negative meter MW), VER generation, time of day
+**Intent:** Detect grid charging before utility bills or plant operator notices
+**Action:** Review whether grid charging was intentional (economic) or erroneous
+
+#### T11: LMP Forecast Accuracy — DA
+**Condition:** STORA's DA LMP forecast deviates from actual realized RT LMP by more than a threshold (e.g., MAPE > 50% over a rolling 24-hour window).
+**Inputs:** STORA forecast LMPs vs. actual realized RT prices
+**Intent:** Monitor whether STORA's price forecasting is accurate enough to make good optimization decisions
+**Action:** Informational — review forecast model inputs and parameters
+
+### 15.3 Resource-Specific Rules (RA Compliance)
+
+These rules apply only to specific resources with Resource Adequacy (RA) obligations.
+
+#### R1: Full Capacity Not Offered to Market — DA
+**Condition:** The highest MW segment of the DA energy bid in any hour is less than the resource's NQC (Net Qualifying Capacity, approximated by nameplate MW for prototype).
+**Inputs:** DA bid segments (highest MW point per hour)
+**Intent:** RA bidding rule compliance — RA resources must offer full capacity
+**Applies to:** DSFLWR_2_W9CSB2, PUTHCR_1_PCNSB1, KRAMER_1_R1BX3, RSMNDS_2_CSRBT1, SANDRN_2_SS1BT1
+**Action:** Informational — NA
+
+#### R2: Full DAME Ancillary Products Not Offered — DA
+**Condition:** Resource is not bidding its full capacity into DAME ancillary service products (Imbalance Reserve Up/Down, Reliability Capacity Up/Down — IRU, IRD, RCU, RCD).
+**Inputs:** AS bid quantities for IRU, IRD, RCU, RCD products
+**Intent:** RA bidding rule compliance — must offer full AS capacity
+**Applies to:** DSFLWR_2_W9CSB2, PUTHCR_1_PCNSB1, KRAMER_1_R1BX3, KRAMER_1_R1PX3, RSMNDS_2_CSRBT1, RSMNDS_2_CSRSR1, SANDRN_2_SS1BT1, SANDRN_2_SS1SR1
+**Action:** Informational — NA
+
+#### R3: Positive Bid Price Segment (Solar Sign-Flip) — Both
+**Condition:** Any bid price segment for a solar/curtailment-priced resource has a positive price. Solar resources should be self-scheduled or curtailment-priced (negative/zero prices only); a positive price indicates a sign error.
+**Inputs:** Bid price segments
+**Intent:** Catch sign-flip errors on curtailment pricing
+**Applies to:** KRAMER_1_R1PX3, RSMNDS_2_CSRSR1, SANDRN_2_SS1SR1
+**Action:** Contact DA Org Market Team
+
+### 15.4 Additional Data Requirements
+
+The trader rules require the following data extensions beyond the original prototype schema:
+
+| Data | Description | Used By |
+| --- | --- | --- |
+| VER forecast (ver_forecast.csv) | Variable Energy Resource capacity forecast per solar resource per interval | T3, T5, T10 |
+| LMP forecast (lmp_forecast.csv) | STORA's DA price forecast per node | T11 |
+| Bid status field | VALID/INVALID status returned by market | T6 |
+| Product field on bids | Energy, IRU, IRD, RCU, RCD | R1, R2 |
+| REG award flag | Whether resource has active Regulation award | T1 |
+| Per-resource SOC targets | Configured min/max SOC bounds | T4 |
+| Per-resource curtailment price | Price threshold for curtailment logic | T5 |
+
+---
+
+## 16. Next Steps (Immediate)
+
+1. Review this document with stakeholders and confirm scope boundaries.
+2. Begin Phase 0 discovery (resource inventory, data source documentation).
+3. Identify prototype technology choice (Databricks App vs. AI/BI Dashboard).
+4. Assign owners to discovery tasks.
+5. Schedule kickoff meeting for prototype development (Phase 1).
+
+---
+
+*This is a living document. Version history will be tracked in the workspace.*
 
 1. Review this document with stakeholders and confirm scope boundaries.
 2. Begin Phase 0 discovery (resource inventory, data source documentation).

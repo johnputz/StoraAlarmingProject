@@ -84,6 +84,12 @@ st.session_state["current_page"] = page
 
 # --- Load Common Data ---
 @st.cache_data
+def load_ver_forecast():
+    return load_csv("ver_forecast")
+
+def load_lmp_forecast():
+    return load_csv("lmp_forecast")
+
 def load_resources():
     return load_csv("resources")
 
@@ -248,6 +254,113 @@ def _render_soc_chart(resource_id, op_date, highlight_df):
 # ============================================================
 # PAGE: DASHBOARD
 # ============================================================
+def _render_curtailment_chart(resource_id, node, op_date, highlight_df, nameplate):
+    """T3/T5: VER forecast vs actual generation showing curtailment."""
+    import altair as alt
+    ver = load_ver_forecast()
+    meter = load_csv("meter_reads")
+    prices = load_csv("prices")
+
+    ver_day = ver[(ver["resource_id"] == resource_id) & (ver["operating_date"] == op_date)].copy()
+    meter_day = meter[meter["resource_id"] == resource_id].copy()
+    meter_day["operating_date"] = pd.to_datetime(meter_day["timestamp"]).dt.strftime("%Y-%m-%d")
+    meter_day["hour_ending"] = pd.to_datetime(meter_day["timestamp"]).dt.hour + 1
+    meter_day = meter_day[meter_day["operating_date"] == op_date]
+
+    if ver_day.empty:
+        st.warning("No VER forecast data for this resource/date.")
+        return
+
+    merged = ver_day.merge(meter_day[["hour_ending", "actual_mw"]], on="hour_ending", how="left")
+    merged["curtailed_mw"] = (merged["ver_mw"] - merged["actual_mw"]).clip(lower=0)
+
+    fired_hours = set(highlight_df["hour_ending"].values) if not highlight_df.empty else set()
+    merged["fired"] = merged["hour_ending"].isin(fired_hours)
+
+    base = alt.Chart(merged).encode(x=alt.X("hour_ending:Q", title="Hour Ending", scale=alt.Scale(domain=[1, 24])))
+    ver_line = base.mark_line(color="orange", strokeDash=[5,3]).encode(y=alt.Y("ver_mw:Q", title="MW"), tooltip=["hour_ending", "ver_mw", "actual_mw"])
+    actual_line = base.mark_line(color="blue").encode(y="actual_mw:Q")
+    curtail_area = base.mark_area(opacity=0.3, color="red").encode(y="ver_mw:Q", y2="actual_mw:Q").transform_filter(alt.datum.fired == True)
+
+    st.altair_chart((ver_line + actual_line + curtail_area).properties(
+        title=f"Curtailment: VER Forecast vs Actual — {resource_id} ({op_date})",
+        width=700, height=300
+    ), use_container_width=True)
+    st.caption("🟠 Dashed = VER forecast | 🔵 Solid = Actual generation | 🔴 Shaded = Curtailed MW (fired hours)")
+
+
+def _render_grid_charging_chart(resource_id, op_date, highlight_df):
+    """T10: Show charging during non-solar hours."""
+    import altair as alt
+    meter = load_csv("meter_reads")
+    ver = load_ver_forecast()
+
+    meter_day = meter[meter["resource_id"] == resource_id].copy()
+    meter_day["operating_date"] = pd.to_datetime(meter_day["timestamp"]).dt.strftime("%Y-%m-%d")
+    meter_day["hour_ending"] = pd.to_datetime(meter_day["timestamp"]).dt.hour + 1
+    meter_day = meter_day[meter_day["operating_date"] == op_date]
+
+    # Check for co-located solar VER
+    # Find solar resource at same site (strip last chars to find site)
+    resources = load_resources()
+    site_prefix = resource_id.rsplit("_", 1)[0] if "_" in resource_id else resource_id
+    colocated_solar = resources[(resources["resource_type"] == "solar") & (resources["resource_id"].str.startswith(site_prefix.rsplit("_", 1)[0]))]
+
+    ver_day = pd.DataFrame()
+    if not colocated_solar.empty:
+        solar_id = colocated_solar.iloc[0]["resource_id"]
+        ver_day = ver[(ver["resource_id"] == solar_id) & (ver["operating_date"] == op_date)]
+
+    if not ver_day.empty:
+        merged = meter_day.merge(ver_day[["hour_ending", "ver_mw"]], on="hour_ending", how="left").fillna(0)
+    else:
+        merged = meter_day.copy()
+        merged["ver_mw"] = 0
+
+    fired_hours = set(highlight_df["hour_ending"].values) if not highlight_df.empty else set()
+    merged["fired"] = merged["hour_ending"].isin(fired_hours)
+
+    base = alt.Chart(merged).encode(x=alt.X("hour_ending:Q", title="Hour Ending", scale=alt.Scale(domain=[1, 24])))
+    charge_bars = base.mark_bar(color="steelblue").encode(
+        y=alt.Y("actual_mw:Q", title="MW (negative = charging)"),
+        color=alt.condition(alt.datum.fired == True, alt.value("red"), alt.value("steelblue"))
+    )
+    ver_line = base.mark_line(color="orange", strokeDash=[5,3]).encode(y="ver_mw:Q")
+
+    st.altair_chart((charge_bars + ver_line).properties(
+        title=f"Grid Charging Detection — {resource_id} ({op_date})",
+        width=700, height=300
+    ), use_container_width=True)
+    st.caption("🔵/🔴 Bars = Actual MW (red = fired hours) | 🟠 Dashed = Co-located solar VER (0 = no solar available)")
+
+
+def _render_forecast_accuracy_chart(resource_id, node, op_date, highlight_df):
+    """T11: Forecast LMP vs actual RT LMP."""
+    import altair as alt
+    lmp = load_lmp_forecast()
+    lmp_day = lmp[(lmp["node"] == node) & (lmp["operating_date"] == op_date)].copy()
+
+    if lmp_day.empty:
+        st.warning("No LMP forecast data for this node/date.")
+        return
+
+    fired_hours = set(highlight_df["hour_ending"].values) if not highlight_df.empty else set()
+    lmp_day["fired"] = lmp_day["hour_ending"].isin(fired_hours)
+
+    base = alt.Chart(lmp_day).encode(x=alt.X("hour_ending:Q", title="Hour Ending", scale=alt.Scale(domain=[1, 24])))
+    fcst_line = base.mark_line(color="orange", strokeDash=[5,3]).encode(y=alt.Y("forecast_lmp:Q", title="$/MWh"))
+    actual_line = base.mark_line(color="blue").encode(y="actual_rt_lmp:Q")
+    fired_band = base.mark_rect(opacity=0.2, color="red").encode(
+        x="hour_ending:Q", x2=alt.value(0)
+    ).transform_filter(alt.datum.fired == True)
+
+    st.altair_chart((fcst_line + actual_line).properties(
+        title=f"LMP Forecast Accuracy — {node} ({op_date})",
+        width=700, height=300
+    ), use_container_width=True)
+    st.caption("🟠 Dashed = Stora forecast | 🔵 Solid = Actual RT LMP")
+
+
 def page_dashboard():
     st.title("\U0001f4ca Resource Health Dashboard")
     st.markdown("Real-time status of all managed resources. Click a resource for details.")
@@ -255,6 +368,7 @@ def page_dashboard():
     with st.expander("ℹ️ How to use this Dashboard", expanded=False):
         st.markdown("""
         - **Tiles** show each resource's current health: 🟢 Green = no issues, 🟡 Yellow = warnings, 🔴 Red = critical alerts
+        - **Company** filter: show/hide resources by owner (e.g., filter to "TEA" for production fleet, "Burns Industries" for demo)
         - **Resource Type** filter: show/hide resources by type (solar, battery, hybrid)
         - **Status** filter: show/hide tiles by their health color
         - **Rule Type** filter: toggle between Day-Ahead (DA) and Real-Time (RT) rules — DA rules can be evaluated before the operating day; RT rules require actuals/telemetry
@@ -266,17 +380,20 @@ def page_dashboard():
     open_alerts = alerts[alerts["status"] == "OPEN"] if not alerts.empty else pd.DataFrame()
 
     # Filters
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    companies = sorted(resources["company"].dropna().unique()) if "company" in resources.columns else []
+    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
     with col_f1:
+        company_filter = st.multiselect("Company", companies, default=companies)
+    with col_f2:
         type_filter = st.multiselect("Resource Type", ["solar", "battery", "hybrid"],
                                      default=["solar", "battery", "hybrid"])
-    with col_f2:
+    with col_f3:
         status_filter = st.multiselect("Status", ["GREEN", "YELLOW", "RED"],
                                        default=["GREEN", "YELLOW", "RED"])
-    with col_f3:
+    with col_f4:
         data_req_filter = st.multiselect("Rule Type", ["DA", "RT"], default=["DA", "RT"],
                                          help="DA = Day-Ahead only, RT = Requires real-time/actuals")
-    with col_f4:
+    with col_f5:
         st.markdown(f"**Last evaluated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     # Apply DA/RT filter to alerts
@@ -289,14 +406,23 @@ def page_dashboard():
         open_alerts = open_alerts[open_alerts["rule_id"].isin(matching_rule_ids)]
 
     # Show filter summary when non-default
+    filter_notes = []
     if set(data_req_filter) != {"DA", "RT"}:
-        st.info(f"\U0001f50d **Filtered to {', '.join(data_req_filter)} rules only** \u2014 {len(open_alerts)} matching open alerts")
+        filter_notes.append(f"{', '.join(data_req_filter)} rules only")
+    if companies and set(company_filter) != set(companies):
+        filter_notes.append(f"Company: {', '.join(company_filter)}")
+    if filter_notes:
+        st.info(f"\U0001f50d **Active filters:** {' | '.join(filter_notes)} \u2014 {len(open_alerts)} matching open alerts")
 
     st.markdown("---")
 
     # Resource tiles
     filtered_resources = resources[resources["resource_type"].isin(type_filter)]
-    cols = st.columns(max(len(filtered_resources), 1))
+    if "company" in filtered_resources.columns:
+        filtered_resources = filtered_resources[filtered_resources["company"].isin(company_filter)]
+    # Use 4 columns grid for readability with many resources
+    num_cols = min(4, max(len(filtered_resources), 1))
+    cols = st.columns(num_cols)
     for idx, (_, res) in enumerate(filtered_resources.iterrows()):
         res_alerts = open_alerts[open_alerts["resource_id"] == res["resource_id"]] if not open_alerts.empty else pd.DataFrame()
         red_count = len(res_alerts[res_alerts["severity"] == "RED"]) if not res_alerts.empty else 0
@@ -315,14 +441,14 @@ def page_dashboard():
         type_icons = {"solar": "\u2600\ufe0f", "battery": "\U0001f50b", "hybrid": "\u26a1"}
         type_icon = type_icons.get(res["resource_type"], "\u2753")
 
-        with cols[idx]:
+        with cols[idx % num_cols]:
             st.markdown(f"""
             <div style="border: 3px solid {status_color}; border-radius: 12px; padding: 20px;
                         text-align: center; background: linear-gradient(135deg, {status_color}15, {status_color}05);">
                 <h2 style="margin:0;">{status_emoji}</h2>
                 <h3 style="margin:5px 0; height:2.8em; display:flex; align-items:center; justify-content:center;">{type_icon} {res['resource_name']}</h3>
                 <p style="color:gray; margin:2px 0;">{res['resource_type'].title()} | {res['nameplate_mw']:.0f} MW</p>
-                <p style="color:gray; margin:2px 0;">{res['client_name']}</p>
+                <p style="color:gray; margin:2px 0;">{res.get('company', res['client_name'])}</p>
                 <hr style="margin:10px 0;">
                 <p style="font-size:1.1em;"><b>Active Alerts:</b>
                     <span style="color:#FF4B4B;">{red_count} RED</span> |

@@ -1,5 +1,16 @@
-resource_id,resource_name,resource_type,iso,node,nameplate_mw,capacity_mwh,client_name
-RES-001,Springfield Solar,solar,CAISO,SPRNGFLD_1_SOLAR,50.0,,Springfield Power Co
-RES-002,Burns Battery,battery,CAISO,BURNS_1_BESS,100.0,400.0,Burns Industries
-RES-003,Shelbyville Sun & Store,hybrid,CAISO,SHELBY_2_HYBRD,75.0,200.0,Shelbyville Municipal
-RES-004,Krusty's Clean Energy,hybrid,CAISO,KRUSTY_1_HYBRD,60.0,150.0,Krusty Brand Enterprises
+resource_id,resource_name,resource_type,iso,node,nameplate_mw,capacity_mwh,client_name,company,soc_min_target,soc_max_target,curtailment_price
+RES-001,Springfield Solar,solar,CAISO,SPRNGFLD_1_SOLAR,50,,Springfield Power Co,Burns Industries,,,-30.0
+RES-002,Burns Battery,battery,CAISO,BURNS_1_BESS,100,400.0,Burns Industries,Burns Industries,10.0,90.0,
+RES-003,Shelbyville Sun & Store,hybrid,CAISO,SHELBY_2_HYBRD,75,200.0,Shelbyville Municipal,Burns Industries,15.0,85.0,-25.0
+RES-004,Krusty's Clean Energy,hybrid,CAISO,KRUSTY_1_HYBRD,60,150.0,Krusty Brand Enterprises,Burns Industries,10.0,90.0,-20.0
+ARCATA_6_FCPSB1,Arcata BESS Unit 1,battery,CAISO,ARCATA_6_FCPSB1,100,400.0,TEA,TEA,10.0,90.0,
+ARCATA_6_FCPSB2,Arcata BESS Unit 2,battery,CAISO,ARCATA_6_FCPSB2,100,400.0,TEA,TEA,10.0,90.0,
+DSFLWR_2_W9CSB2,Desert Flower BESS,battery,CAISO,DSFLWR_2_W9CSB2,100,400.0,TEA,TEA,10.0,90.0,
+JANCRK_6_RCABT1,January Creek BESS,battery,CAISO,JANCRK_6_RCABT1,100,400.0,TEA,TEA,10.0,90.0,
+PUTHCR_1_PCNSB1,Putah Creek BESS,battery,CAISO,PUTHCR_1_PCNSB1,100,400.0,TEA,TEA,10.0,90.0,
+KRAMER_1_R1BX3,Kramer BESS,battery,CAISO,KRAMER_1_R1BX3,100,400.0,TEA,TEA,10.0,90.0,
+KRAMER_1_R1PX3,Kramer Solar,solar,CAISO,KRAMER_1_R1PX3,75,,TEA,TEA,,,-35.0
+RSMNDS_2_CSRBT1,Rosamond BESS,battery,CAISO,RSMNDS_2_CSRBT1,100,400.0,TEA,TEA,10.0,90.0,
+RSMNDS_2_CSRSR1,Rosamond Solar,solar,CAISO,RSMNDS_2_CSRSR1,75,,TEA,TEA,,,-30.0
+SANDRN_2_SS1BT1,San Bernardino BESS,battery,CAISO,SANDRN_2_SS1BT1,100,400.0,TEA,TEA,10.0,90.0,
+SANDRN_2_SS1SR1,San Bernardino Solar,solar,CAISO,SANDRN_2_SS1SR1,75,,TEA,TEA,,,-30.0
